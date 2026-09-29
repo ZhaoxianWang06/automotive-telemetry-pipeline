@@ -18,7 +18,7 @@ This is a automotive demo: a thermal-control loop emits high-rate bus and firmwa
 数据流：
 
 ```text
-middleware_simulator  →  data/raw/*.csv  →  telemetry_analyzer  →  output/
+thermal_middleware  →  data/raw/*.csv  →  thermal_diagnostics  →  output/
      周期调度与组帧              总线+固件+标签              解码 / 特征 / 诊断
 ```
 
@@ -60,12 +60,12 @@ docker compose up --build
 
 ```text
 .
-├── docker-compose.yml          # 先跑模拟器，成功后再跑分析器
-├── .github/workflows/pipeline.yml
+├── docker-compose.yml          # 先跑 thermal_middleware，成功后再跑 thermal_diagnostics
+├── .github/workflows/ci.yml
 ├── data/raw/                   # 运行时日志（csv 不入库）
 ├── output/                     # 报告（png 不入库）
-├── middleware_simulator/       # 产数：中间件调度 + 热闭环任务
-└── telemetry_analyzer/         # 消费日志：解析、特征、诊断
+├── thermal_middleware/         # ECU 侧：调度 + 热闭环任务 + 组帧
+└── thermal_diagnostics/        # 离线：解析、特征、诊断
 ```
 
 ### 根目录文件
@@ -73,64 +73,61 @@ docker compose up --build
 | 文件 | 作用 |
 |------|------|
 | `README.md` | 本说明 |
-| `docker-compose.yml` | 编排 `simulator` 与 `analyzer`；挂载 `./data`、`./output`；环境变量 `SCENARIO`、`DURATION_SEC` |
+| `docker-compose.yml` | 编排 `thermal_middleware` 与 `thermal_diagnostics`；挂载 `./data`、`./output`；环境变量 `SCENARIO`、`DURATION_SEC` |
 | `.gitignore` | 忽略缓存、虚拟环境、生成的 csv/png；保留目录占位 `.gitkeep` |
-| `.github/workflows/pipeline.yml` | CI：分析器镜像内 `pytest`，再端到端跑模拟器与分析器 |
+| `.github/workflows/ci.yml` | CI：诊断镜像内 `pytest`，再端到端跑中间件与诊断 |
 
-### `middleware_simulator/` — 产数与中间件框架
+### `thermal_middleware/` — ECU 热管理中间件
 
-详见 [`middleware_simulator/README.md`](middleware_simulator/README.md)。
+详见 [`thermal_middleware/README.md`](thermal_middleware/README.md)。
 
 | 路径 | 作用 |
 |------|------|
-| `main.py` | 入口：读 `DEPLOY_CONFIG`（默认部署 YAML），启动 `MiddlewareRuntime` |
-| `Dockerfile` | Python 3.11 镜像，非 root 用户运行 `python main.py` |
+| `main.py` | 入口：读 `DEPLOY_CONFIG`，启动 `MiddlewareRuntime` |
+| `Dockerfile` | Python 3.11 镜像，非 root 运行 `python main.py` |
 | `.dockerignore` | 减小构建上下文 |
 | `requirements.txt` | PyYAML、NumPy、pandas |
-| `config/deployment/Thermal.deploy.yaml` | 活动实例映射到两个模拟 ECU，以及同 tick 内执行优先级 `importance` |
+| `config/deployment/Thermal.deploy.yaml` | 活动实例映射到两个模拟 ECU，同 tick 优先级 `importance` |
 | `config/deployment/Thermal.activity_graph.yaml` | 工程名、仿真步长/时长/场景、活动实例与端口连线 |
-| `config/interfaces/ThermalInterfaces.interfaces.yaml` | 报文类型：CAN ID、是否 CAN FD、DLC、周期、信号名 |
-| `config/activities/*.activity.yaml` | 每个活动的周期、端口、内部 runnable 实例 |
-| `config/runnables/*.runnable.yaml` | 每个 runnable 的端口契约（无算法） |
-| `src/loader.py` | 加载部署 YAML → activity graph → activities / interfaces |
-| `src/runtime.py` | 周期调度、last-value COM、写 ground truth 与 `architecture.dot` |
-| `src/scenarios.py` | 场景预设：升温斜率、卡泵时间窗、传感器尖峰、丢帧率 |
-| `src/can_codec.py` | 热管理信号 ↔ CAN/FD payload 打包 |
-| `src/tasks/` | 四个任务的 Python 执行逻辑（对应控制闭环） |
-| `src/tasks/battery_temp_sensor.py` | 合成电池温度（噪声、可选尖峰） |
-| `src/tasks/coolant_plant.py` | 冷却对象模型与卡泵注入 |
-| `src/tasks/thermal_controller.py` | 温度阈值策略、写固件状态日志 |
-| `src/tasks/can_gateway.py` | 组帧、抖动、随机丢帧、写总线 CSV |
-| `src/tasks/__init__.py` | 类型名 → 任务类注册表 |
-| `src/runnables.py` | 兼容旧导入名，转调 `TASK_TYPES` |
-| `src/dag_engine.py` | 兼容旧类名，内部仍是 `MiddlewareRuntime` |
-| `src/__init__.py` | 包标记 |
+| `config/interfaces/ThermalInterfaces.interfaces.yaml` | 报文：CAN ID、CAN FD、DLC、周期、信号名 |
+| `config/activities/*.activity.yaml` | 周期、端口、内部 runnable 实例 |
+| `config/runnables/*.runnable.yaml` | runnable 端口契约（无算法） |
+| `thermal_mw/loader.py` | 加载部署 YAML → activity graph → activities / interfaces |
+| `thermal_mw/runtime.py` | 周期调度、last-value COM、ground truth 与 `architecture.dot` |
+| `thermal_mw/scenarios.py` | 场景：升温、卡泵窗、传感器尖峰、丢帧率 |
+| `thermal_mw/can_codec.py` | 热管理信号 ↔ CAN/FD payload |
+| `thermal_mw/tasks/` | 四个 SWC 的 Python 实现 |
+| `thermal_mw/tasks/battery_temp_sensor.py` | 合成电池温度 |
+| `thermal_mw/tasks/coolant_plant.py` | 冷却对象与卡泵 |
+| `thermal_mw/tasks/thermal_controller.py` | 阈值策略与固件状态日志 |
+| `thermal_mw/tasks/can_gateway.py` | 组帧、抖动、丢帧 |
+| `thermal_mw/tasks/__init__.py` | 类型名 → 任务类 |
+| `thermal_mw/__init__.py` | Python 包 |
 
+### `thermal_diagnostics/` — 离线诊断
 
-### `telemetry_analyzer/` — 日志分析
-
-详见 [`telemetry_analyzer/README.md`](telemetry_analyzer/README.md)。
+详见 [`thermal_diagnostics/README.md`](thermal_diagnostics/README.md)。
 
 | 路径 | 作用 |
 |------|------|
-| `main.py` | 串联解析 → 特征 → 检测 → 报告 |
-| `Dockerfile` | 含 matplotlib 系统库，默认跑分析；CI 可 `pytest` |
+| `main.py` | 解析 → 特征 → 检测 → 报告 |
+| `Dockerfile` | 含 matplotlib；默认证诊断，CI 可 `pytest` |
 | `requirements.txt` | pandas、numpy、matplotlib、pytest |
-| `pytest.ini` | `pythonpath = .`，测试目录 `tests/` |
-| `src/can_codec.py` | 与模拟器一致的**解码**（分析镜像独立，不依赖模拟器包） |
-| `src/parser.py` | 读帧日志或旧版宽表 CSV，按报文分流 `merge_asof` 到 100 Hz 网格，合并固件与可选 ground truth |
-| `src/physics_engine.py` | 中值滤波与差分特征 |
-| `src/anomaly_detector.py` | 泵跟踪误差阈值、状态机跳变、偶发簇统计 |
-| `src/reporter.py` | PNG、`summary_report.txt`、`dynamic_features.csv` |
-| `tests/test_pipeline.py` | 缺文件报错、编解码、旧 CSV 管线、帧日志卡泵检测 |
+| `pytest.ini` | `pythonpath = .` |
+| `thermal_diag/can_codec.py` | 解码（与中间件编码一致，镜像独立） |
+| `thermal_diag/bus_log_parser.py` | 帧或宽表 → 100 Hz 网格 |
+| `thermal_diag/thermal_features.py` | 中值滤波与差分特征 |
+| `thermal_diag/firmware_fault_detector.py` | 跟踪误差、状态机、偶发簇 |
+| `thermal_diag/diagnosis_report.py` | PNG、摘要、特征 CSV |
+| `tests/test_pipeline.py` | 编解码、遗留 CSV、帧日志卡泵 |
 
 ---
 
 ## 中间件如何工作 / Middleware (bonus)
 
-YAML **只声明**周期、端口和部署；算法在 `src/tasks/`。
+YAML **只声明**周期、端口和部署；算法在 `thermal_mw/tasks/`。
 
-运行时：按 `importance` 排序同一 tick 内的活动；每个活动按 `cycle_ms` / `offset_ms` 触发；输入来自软件总线上游端口的**最新样本**（last-value COM）。热闭环允许反馈，因此这不是严格 DAG 执行（`dag_engine.py` 仅为历史名称）。
+运行时：按 `importance` 排序同一 tick 内的活动；每个活动按 `cycle_ms` / `offset_ms` 触发；输入来自软件总线上游端口的**最新样本**（last-value COM）。热闭环允许反馈，调度按周期触发而非 DAG 拓扑排序。
 
 两路 ECU 仅用于展示部署视图：`thermal_ecu`（传感/对象/策略）、`gateway_ecu`（组帧落盘）。
 
@@ -174,7 +171,7 @@ YAML **只声明**周期、端口和部署；算法在 `src/tasks/`。
 在仓库根目录创建 `data/raw` 与 `output`（若尚未存在）。
 
 ```bash
-cd middleware_simulator
+cd thermal_middleware
 python -m pip install -r requirements.txt
 set DATA_DIR=..\data
 set SCENARIO=intermittent_pump
@@ -185,7 +182,7 @@ python main.py
 Linux/macOS 使用 `export DATA_DIR=...`。然后：
 
 ```bash
-cd ../telemetry_analyzer
+cd ../thermal_diagnostics
 python -m pip install -r requirements.txt
 set DATA_DIR=..\data
 set OUTPUT_DIR=..\output
@@ -193,7 +190,7 @@ python main.py
 python -m pytest
 ```
 
-必须在**各包子目录**执行，保证 `from src...` 与相对路径 `config/` 正确。
+必须在**各组件目录**执行，保证 `from thermal_mw...` / `from thermal_diag...` 与相对路径 `config/` 正确。
 
 ---
 

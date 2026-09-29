@@ -24,7 +24,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src ./src
+COPY thermal_diag ./thermal_diag
 COPY tests ./tests
 COPY pytest.ini .
 COPY main.py .

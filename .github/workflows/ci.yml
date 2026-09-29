@@ -1,0 +1,18 @@
+name: thermal-sw-ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  container-pipeline:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests in diagnostics image
+        run: docker compose run --rm --no-deps thermal_diagnostics pytest -q
+      - name: End-to-end middleware then diagnostics
+        run: |
+          docker compose run --rm thermal_middleware
+          docker compose run --rm --no-deps thermal_diagnostics

@@ -2,7 +2,7 @@ import os
 
 import pandas as pd
 
-from src.can_codec import BATTERY_ID, CMD_ID, COOLANT_ID, unpack_frame
+from thermal_diag.can_codec import BATTERY_ID, CMD_ID, COOLANT_ID, unpack_frame
 
 STATE_NAMES = {
     0: "NORMAL",
@@ -11,7 +11,7 @@ STATE_NAMES = {
 }
 
 
-class TelemetryParser:
+class BusLogParser:
 
   def __init__(self, can_log_path: str, telemetry_path: str, truth_path: str | None = None):
     self.can_path = can_log_path

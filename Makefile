@@ -4,14 +4,14 @@ build:
 	docker compose build
 
 test:
-	docker compose run --rm --no-deps analyzer pytest -q
+	docker compose run --rm --no-deps thermal_diagnostics pytest -q
 
 sim:
-	docker compose run --rm simulator
+	docker compose run --rm thermal_middleware
 
 analyze:
-	docker compose run --rm --no-deps analyzer
+	docker compose run --rm --no-deps thermal_diagnostics
 
 pipeline:
-	docker compose run --rm simulator
-	docker compose run --rm --no-deps analyzer
+	docker compose run --rm thermal_middleware
+	docker compose run --rm --no-deps thermal_diagnostics

@@ -2,7 +2,7 @@
 
 import os
 
-from src.runtime import MiddlewareRuntime
+from thermal_mw.runtime import MiddlewareRuntime
 
 
 def main() -> None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import os
 
-from src.can_codec import (
+from thermal_mw.can_codec import (
     BATTERY_ID,
     CMD_ID,
     COOLANT_ID,

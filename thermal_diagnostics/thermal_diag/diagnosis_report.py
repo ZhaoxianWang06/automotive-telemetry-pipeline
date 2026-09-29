@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-class AnalysisReporter:
+class DiagnosisReport:
 
   def __init__(self, df: pd.DataFrame, summary: dict):
     self.df = df

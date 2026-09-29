@@ -7,10 +7,10 @@ import os
 
 import numpy as np
 
-from src.can_codec import BATTERY_ID, CMD_ID, COOLANT_ID
-from src.loader import load_deployment
-from src.scenarios import fault_type_at, resolve_scenario
-from src.tasks import TASK_TYPES
+from thermal_mw.can_codec import BATTERY_ID, CMD_ID, COOLANT_ID
+from thermal_mw.loader import load_deployment
+from thermal_mw.scenarios import fault_type_at, resolve_scenario
+from thermal_mw.tasks import TASK_TYPES
 
 
 class MiddlewareRuntime:

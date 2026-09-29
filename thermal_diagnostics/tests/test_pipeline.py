@@ -4,11 +4,11 @@ import struct
 import pandas as pd
 import pytest
 
-from src.anomaly_detector import FirmwareAnomalyDetector
-from src.can_codec import BATTERY_ID, unpack_frame
-from src.parser import TelemetryParser
-from src.physics_engine import VehiclePhysicsEngine
-from src.reporter import AnalysisReporter
+from thermal_diag.bus_log_parser import BusLogParser
+from thermal_diag.can_codec import BATTERY_ID, unpack_frame
+from thermal_diag.diagnosis_report import DiagnosisReport
+from thermal_diag.firmware_fault_detector import FirmwareFaultDetector
+from thermal_diag.thermal_features import ThermalFeatureExtractor
 
 
 def _write_legacy_csvs(raw_dir: str) -> None:
@@ -72,7 +72,7 @@ def _write_frame_csvs(raw_dir: str) -> None:
 
 
 def test_parser_requires_input_files(tmp_path):
-  parser = TelemetryParser(
+  parser = BusLogParser(
       str(tmp_path / "missing_can.csv"),
       str(tmp_path / "missing_tel.csv"),
   )
@@ -91,7 +91,7 @@ def test_pipeline_aligns_physics_and_detects(tmp_path):
   raw_dir.mkdir()
   _write_legacy_csvs(str(raw_dir))
 
-  parser = TelemetryParser(
+  parser = BusLogParser(
       str(raw_dir / "can_bus_log.csv"),
       str(raw_dir / "firmware_telemetry.csv"),
   )
@@ -99,11 +99,11 @@ def test_pipeline_aligns_physics_and_detects(tmp_path):
   assert not df_aligned.empty
   assert {"time", "pump_cmd", "pump_actual", "battery_temp"}.issubset(df_aligned.columns)
 
-  df_enriched = VehiclePhysicsEngine(df_aligned).compute_metrics()
+  df_enriched = ThermalFeatureExtractor(df_aligned).compute_metrics()
   assert "control_latency_proxy" in df_enriched.columns
   assert "temp_rate_of_change" in df_enriched.columns
 
-  df_anomalies, summary = FirmwareAnomalyDetector(df_enriched).detect()
+  df_anomalies, summary = FirmwareFaultDetector(df_enriched).detect()
   assert "is_anomaly" in df_anomalies.columns
   assert "root_cause_tag" in df_anomalies.columns
   assert summary["total_samples"] == len(df_anomalies)
@@ -112,7 +112,7 @@ def test_pipeline_aligns_physics_and_detects(tmp_path):
 
   output_dir = tmp_path / "output"
   output_dir.mkdir()
-  AnalysisReporter(df_anomalies, summary).generate_report(str(output_dir))
+  DiagnosisReport(df_anomalies, summary).generate_report(str(output_dir))
   assert (output_dir / "firmware_anomaly_report.png").is_file()
   assert (output_dir / "summary_report.txt").is_file()
   assert (output_dir / "dynamic_features.csv").is_file()
@@ -122,12 +122,12 @@ def test_frame_log_detects_stuck_pump(tmp_path):
   raw_dir = tmp_path / "raw"
   raw_dir.mkdir()
   _write_frame_csvs(str(raw_dir))
-  df = TelemetryParser(
+  df = BusLogParser(
       str(raw_dir / "can_bus_log.csv"),
       str(raw_dir / "firmware_telemetry.csv"),
       str(raw_dir / "fault_ground_truth.csv"),
   ).process()
-  df = VehiclePhysicsEngine(df).compute_metrics()
-  df, summary = FirmwareAnomalyDetector(df).detect()
+  df = ThermalFeatureExtractor(df).compute_metrics()
+  df, summary = FirmwareFaultDetector(df).detect()
   assert summary["anomaly_count"] >= 1
   assert (df["root_cause_tag"] == "Actuator_Stuck_Or_Intermittent").any()

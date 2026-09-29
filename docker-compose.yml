@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: UNLICENSED
-# Simulator writes CAN/FD + firmware logs; analyzer consumes the same DATA_DIR.
+# thermal_middleware writes CAN/FD + firmware logs; thermal_diagnostics consumes DATA_DIR.
 
 name: thermal-log-pipeline
 
 services:
-  simulator:
+  thermal_middleware:
     build:
-      context: ./middleware_simulator
+      context: ./thermal_middleware
       dockerfile: Dockerfile
-    image: thermal-middleware-simulator:1.0.0
+    image: thermal-middleware:1.0.0
     read_only: true
     tmpfs:
       - /tmp
@@ -20,11 +20,11 @@ services:
       SCENARIO: ${SCENARIO:-intermittent_pump}
       DURATION_SEC: ${DURATION_SEC:-30}
 
-  analyzer:
+  thermal_diagnostics:
     build:
-      context: ./telemetry_analyzer
+      context: ./thermal_diagnostics
       dockerfile: Dockerfile
-    image: thermal-telemetry-analyzer:1.0.0
+    image: thermal-diagnostics:1.0.0
     read_only: true
     tmpfs:
       - /tmp
@@ -38,5 +38,5 @@ services:
       MPLCONFIGDIR: /tmp/matplotlib
       XDG_CACHE_HOME: /tmp
     depends_on:
-      simulator:
+      thermal_middleware:
         condition: service_completed_successfully
