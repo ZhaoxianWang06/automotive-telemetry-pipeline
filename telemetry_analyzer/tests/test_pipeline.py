@@ -1,15 +1,17 @@
 import os
+import struct
 
 import pandas as pd
 import pytest
 
 from src.anomaly_detector import FirmwareAnomalyDetector
+from src.can_codec import BATTERY_ID, unpack_frame
 from src.parser import TelemetryParser
 from src.physics_engine import VehiclePhysicsEngine
 from src.reporter import AnalysisReporter
 
 
-def _write_fixture_csvs(raw_dir: str) -> None:
+def _write_legacy_csvs(raw_dir: str) -> None:
   can = pd.DataFrame(
       {
           "timestamp": [0, 20, 40, 60, 80, 100],
@@ -30,6 +32,45 @@ def _write_fixture_csvs(raw_dir: str) -> None:
   tel.to_csv(os.path.join(raw_dir, "firmware_telemetry.csv"), index=False)
 
 
+def _write_frame_csvs(raw_dir: str) -> None:
+  batt = struct.pack("<h6x", 4300)
+  cool_ok = struct.pack("<hH12x", 3800, 2500)
+  cool_stuck = struct.pack("<hH12x", 3850, 800)
+  cmd = struct.pack("<HHB3x", 6500, 5500, 1)
+  frames = pd.DataFrame(
+      [
+          {"timestamp_ms": 0, "bus": "can0", "can_id": "0x310", "is_fd": 0, "dlc": 8, "payload_hex": batt.hex()},
+          {"timestamp_ms": 0, "bus": "can1", "can_id": "0x320", "is_fd": 1, "dlc": 16, "payload_hex": cool_ok.hex()},
+          {"timestamp_ms": 0, "bus": "can0", "can_id": "0x330", "is_fd": 0, "dlc": 8, "payload_hex": cmd.hex()},
+          {"timestamp_ms": 40, "bus": "can0", "can_id": "0x310", "is_fd": 0, "dlc": 8, "payload_hex": batt.hex()},
+          {"timestamp_ms": 40, "bus": "can1", "can_id": "0x320", "is_fd": 1, "dlc": 16, "payload_hex": cool_stuck.hex()},
+          {"timestamp_ms": 40, "bus": "can0", "can_id": "0x330", "is_fd": 0, "dlc": 8, "payload_hex": cmd.hex()},
+      ]
+  )
+  tel = pd.DataFrame(
+      {
+          "timestamp_ms": [0, 20, 40],
+          "state_id": [1, 1, 1],
+          "state_name": ["ELEVATED", "ELEVATED", "ELEVATED"],
+          "previous_state_name": ["ELEVATED", "ELEVATED", "ELEVATED"],
+          "transition_reason": ["", "", ""],
+          "battery_temp": [43.0, 43.1, 43.2],
+          "pump_cmd": [65.0, 65.0, 65.0],
+          "fan_cmd": [55.0, 55.0, 55.0],
+      }
+  )
+  truth = pd.DataFrame(
+      {
+          "timestamp_ms": [0, 20, 40],
+          "fault_type": ["none", "stuck_pump", "stuck_pump"],
+          "active": [0, 1, 1],
+      }
+  )
+  frames.to_csv(os.path.join(raw_dir, "can_bus_log.csv"), index=False)
+  tel.to_csv(os.path.join(raw_dir, "firmware_telemetry.csv"), index=False)
+  truth.to_csv(os.path.join(raw_dir, "fault_ground_truth.csv"), index=False)
+
+
 def test_parser_requires_input_files(tmp_path):
   parser = TelemetryParser(
       str(tmp_path / "missing_can.csv"),
@@ -39,10 +80,16 @@ def test_parser_requires_input_files(tmp_path):
     parser.process()
 
 
+def test_can_codec_roundtrip():
+  payload = struct.pack("<h6x", 4250)
+  decoded = unpack_frame(BATTERY_ID, payload.hex())
+  assert decoded["battery_temp"] == pytest.approx(42.5)
+
+
 def test_pipeline_aligns_physics_and_detects(tmp_path):
   raw_dir = tmp_path / "raw"
   raw_dir.mkdir()
-  _write_fixture_csvs(str(raw_dir))
+  _write_legacy_csvs(str(raw_dir))
 
   parser = TelemetryParser(
       str(raw_dir / "can_bus_log.csv"),
@@ -50,9 +97,7 @@ def test_pipeline_aligns_physics_and_detects(tmp_path):
   )
   df_aligned = parser.process()
   assert not df_aligned.empty
-  assert {"time", "pump_cmd", "pump_actual", "battery_temp"}.issubset(
-      df_aligned.columns
-  )
+  assert {"time", "pump_cmd", "pump_actual", "battery_temp"}.issubset(df_aligned.columns)
 
   df_enriched = VehiclePhysicsEngine(df_aligned).compute_metrics()
   assert "control_latency_proxy" in df_enriched.columns
@@ -63,9 +108,26 @@ def test_pipeline_aligns_physics_and_detects(tmp_path):
   assert "root_cause_tag" in df_anomalies.columns
   assert summary["total_samples"] == len(df_anomalies)
   assert summary["anomaly_count"] >= 0
+  assert "intermittent_clusters" in summary
 
   output_dir = tmp_path / "output"
   output_dir.mkdir()
   AnalysisReporter(df_anomalies, summary).generate_report(str(output_dir))
   assert (output_dir / "firmware_anomaly_report.png").is_file()
   assert (output_dir / "summary_report.txt").is_file()
+  assert (output_dir / "dynamic_features.csv").is_file()
+
+
+def test_frame_log_detects_stuck_pump(tmp_path):
+  raw_dir = tmp_path / "raw"
+  raw_dir.mkdir()
+  _write_frame_csvs(str(raw_dir))
+  df = TelemetryParser(
+      str(raw_dir / "can_bus_log.csv"),
+      str(raw_dir / "firmware_telemetry.csv"),
+      str(raw_dir / "fault_ground_truth.csv"),
+  ).process()
+  df = VehiclePhysicsEngine(df).compute_metrics()
+  df, summary = FirmwareAnomalyDetector(df).detect()
+  assert summary["anomaly_count"] >= 1
+  assert (df["root_cause_tag"] == "Actuator_Stuck_Or_Intermittent").any()

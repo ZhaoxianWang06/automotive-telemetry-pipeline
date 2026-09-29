@@ -7,4 +7,5 @@ venv/
 output/*
 !output/.gitkeep
 data/raw/*.csv
+!data/raw/.gitkeep
 *.png

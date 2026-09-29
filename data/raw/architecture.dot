@@ -1,0 +1,14 @@
+digraph ThermalMiddleware {
+  rankdir=LR;
+  node [shape=box, fontname="Helvetica"];
+  battery_sensor [label="battery_sensor\nBatteryTempSensor\nthermal_ecu"];
+  coolant_plant [label="coolant_plant\nCoolantPlant\nthermal_ecu"];
+  thermal_mgr [label="thermal_mgr\nThermalController\nthermal_ecu"];
+  can_gateway [label="can_gateway\nCanGateway\ngateway_ecu"];
+  thermal_mgr -> coolant_plant [label="pump_cmd_in"];
+  battery_sensor -> thermal_mgr [label="battery_in"];
+  coolant_plant -> thermal_mgr [label="coolant_in"];
+  battery_sensor -> can_gateway [label="battery_in"];
+  thermal_mgr -> can_gateway [label="cmd_in"];
+  coolant_plant -> can_gateway [label="loop_in"];
+}

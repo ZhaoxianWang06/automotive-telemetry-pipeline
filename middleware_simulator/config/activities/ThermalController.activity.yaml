@@ -4,7 +4,7 @@ imports:
 
 stimulus:
   kind: cyclic
-  cycle_ms: 50
+  cycle_ms: 20
   offset_ms: 0
 
 input_ports:

@@ -1,16 +1,22 @@
-# Thermal management CAN signals (demo stand-in for YAAA interfaces.yaml).
+# Thermal CAN / CAN FD messages. Runtime packing lives in src/can_codec.py.
 
 interfaces:
   - type_name: BatteryTempMsg
     can_id: "0x310"
-    cycle_time_ms: 100
+    bus: can0
+    is_fd: false
+    dlc: 8
+    cycle_time_ms: 10
     signals:
       - name: battery_temp
         unit: degC
 
   - type_name: CoolantLoopMsg
     can_id: "0x320"
-    cycle_time_ms: 20
+    bus: can1
+    is_fd: true
+    dlc: 16
+    cycle_time_ms: 10
     signals:
       - name: coolant_temp
         unit: degC
@@ -19,7 +25,10 @@ interfaces:
 
   - type_name: ThermalMgrCmdMsg
     can_id: "0x330"
-    cycle_time_ms: 50
+    bus: can0
+    is_fd: false
+    dlc: 8
+    cycle_time_ms: 20
     signals:
       - name: pump_cmd
         unit: "%"

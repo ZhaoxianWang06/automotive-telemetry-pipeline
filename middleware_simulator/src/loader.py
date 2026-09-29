@@ -32,12 +32,16 @@ def load_deployment(deploy_path: str) -> dict:
   graph = _load_yaml(graph_path)
 
   activities = {}
+  interfaces = {}
   for rel in graph.get("imports", []):
-    if not str(rel).endswith(".activity.yaml"):
-      continue
     path = _resolve(graph_dir, rel)
-    name = os.path.basename(path).replace(".activity.yaml", "")
-    activities[name] = _load_yaml(path)
+    if str(rel).endswith(".activity.yaml"):
+      name = os.path.basename(path).replace(".activity.yaml", "")
+      activities[name] = _load_yaml(path)
+    elif str(rel).endswith(".interfaces.yaml"):
+      data = _load_yaml(path)
+      for iface in data.get("interfaces") or []:
+        interfaces[iface["type_name"]] = iface
 
   importance = {}
   deploy_to = {}
@@ -49,6 +53,7 @@ def load_deployment(deploy_path: str) -> dict:
       "deploy": deploy,
       "graph": graph,
       "activities": activities,
+      "interfaces": interfaces,
       "importance": importance,
       "deploy_to": deploy_to,
       "graph_path": graph_path,

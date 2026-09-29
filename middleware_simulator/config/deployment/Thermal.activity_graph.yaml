@@ -1,10 +1,12 @@
-# Activity graph: thermal control loop (dataflow may cycle; runtime uses last-value COM).
+# Closed-loop thermal control. Last-value COM; cycles may form a feedback ring.
 
 project: ThermalManagementMiddleware
 simulation:
-  duration_sec: 10
+  duration_sec: 30
   tick_ms: 10
   seed: 42
+  scenario: intermittent_pump
+  can_jitter_ms: 1
 
 imports:
   - ../activities/BatteryTempSensor.activity.yaml
@@ -35,6 +37,8 @@ activity_instances:
   - name: can_gateway
     type: CanGateway
     connections:
+      - from: battery_sensor.output
+        to: battery_in
       - from: thermal_mgr.output
         to: cmd_in
       - from: coolant_plant.output

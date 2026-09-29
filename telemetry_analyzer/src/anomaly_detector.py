@@ -1,5 +1,11 @@
-import numpy as np
 import pandas as pd
+
+
+STATE_NAMES = {
+    0: "NORMAL",
+    1: "ELEVATED",
+    2: "DERATE_FALLBACK",
+}
 
 
 class FirmwareAnomalyDetector:
@@ -8,43 +14,78 @@ class FirmwareAnomalyDetector:
     self.df = df
 
   def detect(self):
-    print('--> 正在进行固件行为异常检测与根因关联...')
+    print("--> 正在定位执行器偶发故障与固件降级状态机...")
 
-    # 使用移动窗口统计法（Rolling Z-Score）检测制动压力突变或物理响应异常
-    window = 20
-    rolling_mean = self.df['control_latency_proxy'].rolling(window=window).mean()
-    rolling_std = self.df['control_latency_proxy'].rolling(window=window).std()
+    err = self.df["pump_tracking_error"].fillna(0)
+    if "thermal_state" in self.df.columns:
+      self.df["thermal_state"] = pd.to_numeric(
+          self.df["thermal_state"], errors="coerce"
+      ).fillna(0).round().astype(int)
+    abs_hit = (err >= 12.0) & (self.df["pump_cmd"].fillna(0) >= 20.0)
+    self.df["is_anomaly"] = abs_hit.astype(bool)
 
-    # 判定异常阈值：超过 3 倍标准差
-    self.df['is_anomaly'] = (
-        (self.df['control_latency_proxy'] - rolling_mean).abs()
-        > (3 * rolling_std)
+    if "state_name" not in self.df.columns:
+      self.df["state_name"] = self.df["thermal_state"].map(STATE_NAMES)
+    self.df["state_name"] = self.df["state_name"].fillna(
+        self.df["thermal_state"].map(STATE_NAMES)
     )
 
-    # 关联固件状态（例如 firmware_state == 2 代表固件进入降级保护/限功率模式）
-    self.df['root_cause_tag'] = 'Normal'
-    self.df.loc[
-        self.df['is_anomaly'] & (self.df['thermal_state'] == 2),
-        'root_cause_tag',
-    ] = 'Firmware_Degraded_Protection'
-    self.df.loc[
-        self.df['is_anomaly'] & (self.df['thermal_state'] != 2),
-        'root_cause_tag',
-    ] = 'Sensor_Noise_Or_Transient_Lag'
+    prev_state = self.df["thermal_state"].shift(1)
+    self.df["state_entered"] = (
+        self.df["thermal_state"].notna()
+        & prev_state.notna()
+        & (self.df["thermal_state"] != prev_state)
+    )
+    self.df["illegal_transition"] = (
+        self.df["state_entered"]
+        & (prev_state == 0)
+        & (self.df["thermal_state"] == 2)
+    )
 
-    anomaly_count = self.df['is_anomaly'].sum()
+    fallback = self.df["thermal_state"] == 2
+    self.df["root_cause_tag"] = "Normal"
+    self.df.loc[self.df["is_anomaly"] & fallback, "root_cause_tag"] = (
+        "Firmware_Degraded_Protection"
+    )
+    self.df.loc[self.df["is_anomaly"] & ~fallback, "root_cause_tag"] = (
+        "Actuator_Stuck_Or_Intermittent"
+    )
+    self.df.loc[self.df["illegal_transition"], "root_cause_tag"] = (
+        "Illegal_State_Skip"
+    )
+
+    truth = self.df["fault_type"] if "fault_type" in self.df.columns else "none"
+    if isinstance(truth, str):
+      self.df["detection_match"] = False
+    else:
+      self.df["detection_match"] = self.df["is_anomaly"] & truth.isin(
+          ["stuck_pump", "sensor_spike"]
+      )
+
+    fallback_entries = int(
+        (self.df["state_entered"] & (self.df["thermal_state"] == 2)).sum()
+    )
+    intermittent_clusters = self._count_clusters(self.df["is_anomaly"] & ~fallback)
+
     summary = {
-        'total_samples': len(self.df),
-        'anomaly_count': anomaly_count,
-        'degraded_events': len(
-            self.df[
-                self.df['root_cause_tag'] == 'Firmware_Degraded_Protection'
-            ]
-        ),
+        "total_samples": len(self.df),
+        "anomaly_count": int(self.df["is_anomaly"].sum()),
+        "degraded_events": fallback_entries,
+        "intermittent_clusters": intermittent_clusters,
+        "illegal_transitions": int(self.df["illegal_transition"].sum()),
+        "fallback_dwell_samples": int(fallback.sum()),
     }
 
     print(
-        f'--> 诊断完成：发现异常点 {anomaly_count} 个，其中固件降级触发事件'
-        f" {summary['degraded_events']} 起。"
+        f"--> 诊断完成：异常点 {summary['anomaly_count']}，"
+        f"降级进入 {summary['degraded_events']} 次，"
+        f"偶发簇 {summary['intermittent_clusters']} 个。"
     )
     return self.df, summary
+
+  def _count_clusters(self, mask: pd.Series) -> int:
+    if mask.empty:
+      return 0
+    values = mask.fillna(False).astype(int)
+    started = values.astype(bool) & ~values.shift(1, fill_value=0).astype(bool)
+    return int(started.sum())

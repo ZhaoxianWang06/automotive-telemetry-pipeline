@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: UNLICENSED
-# Batch pipeline: simulator completes, then analyzer reads the same DATA_DIR.
+# Simulator writes CAN/FD + firmware logs; analyzer consumes the same DATA_DIR.
 
-name: tesla-telemetry-pipeline
+name: thermal-log-pipeline
 
 services:
   simulator:
     build:
       context: ./middleware_simulator
       dockerfile: Dockerfile
-    image: tesla-middleware-simulator:1.0.0
+    image: thermal-middleware-simulator:1.0.0
     read_only: true
     tmpfs:
       - /tmp
@@ -17,12 +17,14 @@ services:
     environment:
       DATA_DIR: /app/data
       DEPLOY_CONFIG: /app/config/deployment/Thermal.deploy.yaml
+      SCENARIO: ${SCENARIO:-intermittent_pump}
+      DURATION_SEC: ${DURATION_SEC:-30}
 
   analyzer:
     build:
       context: ./telemetry_analyzer
       dockerfile: Dockerfile
-    image: tesla-telemetry-analyzer:1.0.0
+    image: thermal-telemetry-analyzer:1.0.0
     read_only: true
     tmpfs:
       - /tmp

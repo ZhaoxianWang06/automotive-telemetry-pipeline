@@ -1,6 +1,5 @@
 """
-Author: [你的名字]
-Description: 模拟特斯拉车辆固件与遥测数据的全链路分析系统，打通日志解析、物理对齐、异常诊断。
+Parse high-rate CAN/FD + firmware logs, extract thermal dynamics, locate fallback and intermittent faults.
 """
 
 import os
@@ -14,20 +13,23 @@ from src.reporter import AnalysisReporter
 def _data_paths():
   data_dir = os.environ.get("DATA_DIR", "data")
   output_dir = os.environ.get("OUTPUT_DIR", "output")
+  raw = os.path.join(data_dir, "raw")
   return {
-      "can": os.path.join(data_dir, "raw", "can_bus_log.csv"),
-      "telemetry": os.path.join(data_dir, "raw", "firmware_telemetry.csv"),
+      "can": os.path.join(raw, "can_bus_log.csv"),
+      "telemetry": os.path.join(raw, "firmware_telemetry.csv"),
+      "truth": os.path.join(raw, "fault_ground_truth.csv"),
       "output": output_dir,
   }
 
 
 def run_pipeline():
-  print("=== [Step 0] 初始化 Tesla 固件遥测数据分析全链路流水线 ===")
+  print("=== [Step 1-3] CAN/FD parse → dynamics → firmware diagnosis ===")
   paths = _data_paths()
 
   parser = TelemetryParser(
       can_log_path=paths["can"],
       telemetry_path=paths["telemetry"],
+      truth_path=paths["truth"],
   )
   df_aligned = parser.process()
 

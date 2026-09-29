@@ -4,10 +4,12 @@ imports:
 
 stimulus:
   kind: cyclic
-  cycle_ms: 20
+  cycle_ms: 10
   offset_ms: 0
 
 input_ports:
+  - name: battery_in
+    type: BatteryTempMsg
   - name: cmd_in
     type: ThermalMgrCmdMsg
   - name: loop_in
@@ -21,6 +23,8 @@ runnable_instances:
 
 connections:
   inputs:
+    - from: battery_in
+      to: gateway.battery_in
     - from: cmd_in
       to: gateway.cmd_in
     - from: loop_in

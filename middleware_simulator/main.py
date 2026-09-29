@@ -1,4 +1,4 @@
-"""Thermal middleware entry: load deployment and run the cyclic COM scheduler."""
+"""Thermal middleware entry: cyclic COM scheduler that emits CAN/FD and firmware logs."""
 
 import os
 

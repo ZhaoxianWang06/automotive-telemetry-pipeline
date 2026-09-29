@@ -2,6 +2,8 @@ imports:
   - ThermalInterfaces.interfaces
 
 input_ports:
+  - name: battery_in
+    type: BatteryTempMsg
   - name: cmd_in
     type: ThermalMgrCmdMsg
   - name: loop_in

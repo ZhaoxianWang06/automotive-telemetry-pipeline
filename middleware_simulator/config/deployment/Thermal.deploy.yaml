@@ -1,5 +1,4 @@
-# Maps activities onto two simulated ECUs (stand-in for YAAA deploy.yaml).
-# Same-tick order: higher importance runs first (sensors/controller before plant/gateway).
+# Two simulated ECUs. Same-tick order: higher importance runs first.
 
 imports:
   - Thermal.activity_graph.yaml
@@ -7,10 +6,10 @@ imports:
 deployment_targets:
   - name: thermal_ecu
     type: zone_controller
-    description: Battery/coolant sensing and thermal manager
+    description: Sensing, plant, and thermal manager
   - name: gateway_ecu
     type: can_gateway
-    description: COM logging onto the vehicle CAN log files
+    description: Packs COM samples onto CAN / CAN FD logs
 
 activity_deployment:
   - activity_instance: battery_sensor
