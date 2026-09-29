@@ -1,0 +1,33 @@
+imports:
+  - ThermalController.runnable
+  - ThermalInterfaces.interfaces
+
+stimulus:
+  kind: cyclic
+  cycle_ms: 50
+  offset_ms: 0
+
+input_ports:
+  - name: battery_in
+    type: BatteryTempMsg
+  - name: coolant_in
+    type: CoolantLoopMsg
+
+output_ports:
+  - name: output
+    type: ThermalMgrCmdMsg
+
+runnable_instances:
+  - name: controller
+    type: ThermalController
+
+connections:
+  inputs:
+    - from: battery_in
+      to: controller.battery_in
+    - from: coolant_in
+      to: controller.coolant_in
+  graph: []
+  outputs:
+    - from: controller.output
+      to: output

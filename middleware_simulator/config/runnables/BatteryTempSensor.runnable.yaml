@@ -1,0 +1,8 @@
+imports:
+  - ThermalInterfaces.interfaces
+
+input_ports: []
+
+output_ports:
+  - name: output
+    type: BatteryTempMsg

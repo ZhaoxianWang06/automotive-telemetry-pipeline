@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: UNLICENSED
+# Batch pipeline: simulator completes, then analyzer reads the same DATA_DIR.
+
+name: tesla-telemetry-pipeline
+
+services:
+  simulator:
+    build:
+      context: ./middleware_simulator
+      dockerfile: Dockerfile
+    image: tesla-middleware-simulator:1.0.0
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./data:/app/data
+    environment:
+      DATA_DIR: /app/data
+      DEPLOY_CONFIG: /app/config/deployment/Thermal.deploy.yaml
+
+  analyzer:
+    build:
+      context: ./telemetry_analyzer
+      dockerfile: Dockerfile
+    image: tesla-telemetry-analyzer:1.0.0
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./data:/app/data:ro
+      - ./output:/app/output
+    environment:
+      DATA_DIR: /app/data
+      OUTPUT_DIR: /app/output
+      MPLBACKEND: Agg
+      MPLCONFIGDIR: /tmp/matplotlib
+      XDG_CACHE_HOME: /tmp
+    depends_on:
+      simulator:
+        condition: service_completed_successfully

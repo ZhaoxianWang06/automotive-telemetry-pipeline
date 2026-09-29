@@ -1,0 +1,29 @@
+# Thermal management CAN signals (demo stand-in for YAAA interfaces.yaml).
+
+interfaces:
+  - type_name: BatteryTempMsg
+    can_id: "0x310"
+    cycle_time_ms: 100
+    signals:
+      - name: battery_temp
+        unit: degC
+
+  - type_name: CoolantLoopMsg
+    can_id: "0x320"
+    cycle_time_ms: 20
+    signals:
+      - name: coolant_temp
+        unit: degC
+      - name: pump_actual
+        unit: "%"
+
+  - type_name: ThermalMgrCmdMsg
+    can_id: "0x330"
+    cycle_time_ms: 50
+    signals:
+      - name: pump_cmd
+        unit: "%"
+      - name: fan_cmd
+        unit: "%"
+      - name: thermal_state
+        unit: enum

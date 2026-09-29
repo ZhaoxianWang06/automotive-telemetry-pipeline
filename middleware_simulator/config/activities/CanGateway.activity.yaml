@@ -1,0 +1,29 @@
+imports:
+  - CanGateway.runnable
+  - ThermalInterfaces.interfaces
+
+stimulus:
+  kind: cyclic
+  cycle_ms: 20
+  offset_ms: 0
+
+input_ports:
+  - name: cmd_in
+    type: ThermalMgrCmdMsg
+  - name: loop_in
+    type: CoolantLoopMsg
+
+output_ports: []
+
+runnable_instances:
+  - name: gateway
+    type: CanGateway
+
+connections:
+  inputs:
+    - from: cmd_in
+      to: gateway.cmd_in
+    - from: loop_in
+      to: gateway.loop_in
+  graph: []
+  outputs: []

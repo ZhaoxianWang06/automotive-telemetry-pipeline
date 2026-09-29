@@ -1,0 +1,29 @@
+imports:
+  - CoolantPlant.runnable
+  - ThermalInterfaces.interfaces
+
+stimulus:
+  kind: cyclic
+  cycle_ms: 20
+  offset_ms: 0
+
+input_ports:
+  - name: pump_cmd_in
+    type: ThermalMgrCmdMsg
+
+output_ports:
+  - name: output
+    type: CoolantLoopMsg
+
+runnable_instances:
+  - name: plant
+    type: CoolantPlant
+
+connections:
+  inputs:
+    - from: pump_cmd_in
+      to: plant.pump_cmd_in
+  graph: []
+  outputs:
+    - from: plant.output
+      to: output

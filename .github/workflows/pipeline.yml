@@ -1,0 +1,18 @@
+name: telemetry-pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  container-pipeline:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests in analyzer image
+        run: docker compose run --rm --no-deps analyzer pytest -q
+      - name: End-to-end simulator then analyzer
+        run: |
+          docker compose run --rm simulator
+          docker compose run --rm --no-deps analyzer

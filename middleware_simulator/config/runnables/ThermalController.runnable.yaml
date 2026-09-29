@@ -1,0 +1,12 @@
+imports:
+  - ThermalInterfaces.interfaces
+
+input_ports:
+  - name: battery_in
+    type: BatteryTempMsg
+  - name: coolant_in
+    type: CoolantLoopMsg
+
+output_ports:
+  - name: output
+    type: ThermalMgrCmdMsg

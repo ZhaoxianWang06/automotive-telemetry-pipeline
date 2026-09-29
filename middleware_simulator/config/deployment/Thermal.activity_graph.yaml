@@ -1,0 +1,41 @@
+# Activity graph: thermal control loop (dataflow may cycle; runtime uses last-value COM).
+
+project: ThermalManagementMiddleware
+simulation:
+  duration_sec: 10
+  tick_ms: 10
+  seed: 42
+
+imports:
+  - ../activities/BatteryTempSensor.activity.yaml
+  - ../activities/CoolantPlant.activity.yaml
+  - ../activities/ThermalController.activity.yaml
+  - ../activities/CanGateway.activity.yaml
+  - ../interfaces/ThermalInterfaces.interfaces.yaml
+
+activity_instances:
+  - name: battery_sensor
+    type: BatteryTempSensor
+    connections: []
+
+  - name: coolant_plant
+    type: CoolantPlant
+    connections:
+      - from: thermal_mgr.output
+        to: pump_cmd_in
+
+  - name: thermal_mgr
+    type: ThermalController
+    connections:
+      - from: battery_sensor.output
+        to: battery_in
+      - from: coolant_plant.output
+        to: coolant_in
+
+  - name: can_gateway
+    type: CanGateway
+    connections:
+      - from: thermal_mgr.output
+        to: cmd_in
+      - from: coolant_plant.output
+        to: loop_in

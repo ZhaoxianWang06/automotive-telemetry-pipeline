@@ -1,0 +1,10 @@
+imports:
+  - ThermalInterfaces.interfaces
+
+input_ports:
+  - name: cmd_in
+    type: ThermalMgrCmdMsg
+  - name: loop_in
+    type: CoolantLoopMsg
+
+output_ports: []

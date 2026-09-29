@@ -1,0 +1,9 @@
+.git
+**/.git
+**/__pycache__
+**/.venv
+**/venv
+**/.pytest_cache
+data/raw/*.csv
+output/
+*.png
